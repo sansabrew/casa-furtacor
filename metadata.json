@@ -1,0 +1,6 @@
+{
+  "name": "Casa Furtacor — Ingressos Afetivos & Eventos Interessantes",
+  "description": "Bilheteria própria e acolhedora da Casa Furtacor em João Pessoa. Agenda cultural, ingressos afetivos com PIX instantâneo e gestão de portaria para amigos e amigas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

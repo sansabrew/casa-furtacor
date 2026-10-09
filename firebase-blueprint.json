@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "evento": {
+      "title": "Evento Casa Furtacor",
+      "description": "Encontros culturais, luaus e saraus no quintal acolhedor da Casa Furtacor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "titulo": { "type": "string" },
+        "local": { "type": "string" },
+        "endereco": { "type": "string" },
+        "dataEvento": { "type": "string" },
+        "horario": { "type": "string" },
+        "valor": { "type": "number" },
+        "imagemUrl": { "type": "string" },
+        "descricao": { "type": "string" },
+        "capacidadeMaxima": { "type": "number" },
+        "ativo": { "type": "boolean" },
+        "tags": {
+          "type": "array",
+          "description": "Categorias do evento (ex: Música, Gastronomia, Workshop)"
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["titulo", "valor", "dataEvento", "horario"]
+    },
+    "ingresso": {
+      "title": "Ingresso de Amigo",
+      "description": "Ingresso nominal individual emitido para o evento com verificação de portaria.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "codigoIngresso": { "type": "string" },
+        "eventoId": { "type": "string" },
+        "clienteNome": { "type": "string" },
+        "clienteDocumento": { "type": "string" },
+        "clienteWhatsapp": { "type": "string" },
+        "valorPago": { "type": "number" },
+        "statusPagamento": { "type": "string", "enum": ["pendente", "pago", "cancelado"] },
+        "checkInRealizado": { "type": "boolean" },
+        "checkInHorario": { "type": "string" },
+        "qrCodeDataUrl": { "type": "string" },
+        "dataCompra": { "type": "string" }
+      },
+      "required": ["codigoIngresso", "clienteNome", "clienteDocumento", "valorPago", "statusPagamento"]
+    },
+    "admin": {
+      "title": "Perfil de Administrador",
+      "description": "Perfil da Dona Rosa ou equipe da casa com permissão de gestão.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "nome": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    },
+    "chat_session": {
+      "title": "Sessão de Atendimento do Chat",
+      "description": "Sessão de atendimento híbrido (IA e Humano) para visitantes.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "session_token": { "type": "string" },
+        "cliente_nome": { "type": "string" },
+        "status": { "type": "string", "enum": ["ia", "aguardando_humano", "em_atendimento", "finalizado"] },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "session_token", "cliente_nome", "status"]
+    },
+    "chat_message": {
+      "title": "Mensagem de Chat",
+      "description": "Mensagem enviada por cliente, IA ou administrador.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "remetente": { "type": "string", "enum": ["cliente", "ia", "admin"] },
+        "mensagem": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "session_id", "remetente", "mensagem", "timestamp"]
+    },
+    "mural_post": {
+      "title": "Publicação do Mural Afetivo",
+      "description": "Recados, avisos e sugestões da comunidade no mural afetivo.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "autor_nome": { "type": "string" },
+        "categoria": { "type": "string", "enum": ["Aviso", "Dúvida", "Sugestão de Artista/Show", "Depoimento"] },
+        "conteudo": { "type": "string" },
+        "curtidas": { "type": "number" },
+        "fixado": { "type": "boolean" },
+        "aprovado": { "type": "boolean" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "autor_nome", "categoria", "conteudo"]
+    },
+    "mural_comentario": {
+      "title": "Comentário no Mural Afetivo",
+      "description": "Respostas e comentários afetuosos sob publicações do mural.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "post_id": { "type": "string" },
+        "autor_nome": { "type": "string" },
+        "comentario": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "post_id", "autor_nome", "comentario"]
+    }
+  },
+  "firestore": {
+    "/eventos/{eventoId}": {
+      "schema": "evento",
+      "description": "Coleção de eventos cadastrados na Casa Furtacor."
+    },
+    "/ingressos/{ingressoId}": {
+      "schema": "ingresso",
+      "description": "Coleção de ingressos gerados para os amigos convidados."
+    },
+    "/admins/{adminId}": {
+      "schema": "admin",
+      "description": "Perfis autorizados para gerenciar a portaria e eventos."
+    },
+    "/chat_sessions/{sessionId}": {
+      "schema": "chat_session",
+      "description": "Sessões de conversa do chat híbrido da casa."
+    },
+    "/chat_messages/{messageId}": {
+      "schema": "chat_message",
+      "description": "Mensagens trocadas no chat entre cliente, IA e equipe."
+    },
+    "/mural_posts/{postId}": {
+      "schema": "mural_post",
+      "description": "Postagens do mural afetivo da comunidade."
+    },
+    "/mural_comentarios/{comentarioId}": {
+      "schema": "mural_comentario",
+      "description": "Comentários da comunidade no mural afetivo."
+    }
+  }
+}

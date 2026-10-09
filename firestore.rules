@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===================================================================
+    // Casa Furtacor — regras de acesso
+    //
+    // IMPORTANTE: a lista de administradores aqui precisa ser mantida em
+    // sincronia com ADMIN_EMAILS_AUTORIZADOS em src/services/firebase.ts.
+    // Esta é a barreira real de segurança; a checagem no front-end é apenas
+    // interface.
+    //
+    // Contexto: visitantes compram ingressos, usam o mural e o chat SEM
+    // estar autenticados. Só a equipe da portaria entra com conta Google.
+    // ===================================================================
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'ritamvbraga@hotmail.com',
+          'benjaminbjp@gmail.com'
+        ];
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Identificadores de sessão são gerados no cliente com aleatoriedade
+    // suficiente para funcionar como segredo de posse (capability).
+    // Não equivale a autenticação: um vazamento de URL expõe a conversa.
+    function isSessionIdConhecido(sessionId) {
+      return sessionId is string
+        && sessionId.matches('sess_user_[A-Za-z0-9_]{10,60}');
+    }
+
+    // Doc de diagnóstico de conectividade. Não guarda dado de cliente.
+    match /test/{docId} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // -------------------------------------------------------------------
+    // Agenda de eventos — pública (é o vitrine do site)
+    // -------------------------------------------------------------------
+    match /eventos/{eventoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Ingressos — CONTÉM DADOS PESSOAIS (nome, CPF, WhatsApp)
+    // Visitantes só podem CRIAR o próprio ingresso ao reservar.
+    // Ler, conferir pagamento e fazer check-in é privativo da portaria.
+    // -------------------------------------------------------------------
+    match /ingressos/{ingressoId} {
+      // A portaria registra amigo manualmente, inclusive já pago — por isso
+      // o atalho isAdmin() antes das restrições que valem para o visitante.
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly([
+          'id', 'eventoId', 'clienteId', 'codigoIngresso', 'statusPagamento',
+          'valorPago', 'checkInRealizado', 'createdAt',
+          'clienteNome', 'clienteDocumento', 'clienteWhatsapp',
+          'eventoTitulo', 'pixPayload', 'pedidoId'
+        ])
+        && request.resource.data.codigoIngresso is string
+        && request.resource.data.codigoIngresso.size() > 0
+        // O visitante não pode se marcar como pago nem gravar check-in.
+        && request.resource.data.statusPagamento == 'pendente'
+        && request.resource.data.checkInRealizado == false
+        && request.resource.data.valorPago is number
+      );
+
+      allow read, update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Perfis administrativos — só a própria equipe
+    // -------------------------------------------------------------------
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && request.auth.uid == adminId;
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------
+    // Chat — sessões
+    // 'list' é o ponto crítico: sem ele, qualquer visitante anônimo
+    // enumeraria todas as conversas da casa. Só a portaria pode listar.
+    // -------------------------------------------------------------------
+    match /chat_sessions/{sessionId} {
+      allow get: if isAdmin() || isSessionIdConhecido(sessionId);
+      allow list: if isAdmin();
+      // O identificador gravado no documento precisa ser o da própria sessão.
+      allow create: if isSignedIn() == false
+        && request.resource.data.keys().hasOnly([
+          'id', 'session_token', 'cliente_nome', 'status',
+          'created_at', 'updated_at', 'ultima_mensagem', 'unread_count'
+        ])
+        && request.resource.data.id == sessionId
+        && request.resource.data.session_token is string
+        && request.resource.data.session_token.size() >= 12;
+      // Não é possível trocar o token de uma sessão: isso entregaria a
+      // conversa a quem assumisse o controle do documento.
+      allow update: if isAdmin()
+        || (request.resource.data.session_token
+              == resource.data.session_token
+            && request.resource.data.id == resource.data.id);
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Chat — mensagens
+    // Anônimo pode escrever mensagens novas, mas não pode ler o acervo:
+    // um 'list' liberado aqui revelaria o histórico de todos os visitantes.
+    // -------------------------------------------------------------------
+    match /chat_messages/{messageId} {
+      allow get, list: if isAdmin();
+      // isAdmin() primeiro: a equipe responde com remetente == 'admin'.
+      allow create: if isAdmin() || (
+        request.resource.data.remetente in ['cliente', 'ia']
+        && request.resource.data.session_id is string
+        && request.resource.data.mensagem is string
+        && request.resource.data.mensagem.size() > 0
+        && request.resource.data.mensagem.size() <= 2000
+        && request.resource.data.timestamp is string
+      );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------
+    // Mural afetivo — leitura pública por natureza
+    // -------------------------------------------------------------------
+    match /mural_posts/{postId} {
+      allow read: if true;
+
+      // Visitante não pode se auto-fixar nem auto-aprovar.
+      allow create: if request.resource.data.fixado == false
+        && request.resource.data.aprovado == false
+        && request.resource.data.conteudo is string
+        && request.resource.data.conteudo.size() > 0
+        && request.resource.data.conteudo.size() <= 2000
+        && request.resource.data.autor_nome is string
+        && request.resource.data.curtidas == 0;
+      // Moderar (fixar/aprovar) é da portaria.
+      allow update: if isAdmin()
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['curtidas']);
+      allow delete: if isAdmin();
+    }
+
+    match /mural_comentarios/{comentarioId} {
+      allow read: if true;
+      allow create: if request.resource.data.comentario is string
+        && request.resource.data.comentario.size() > 0
+        && request.resource.data.comentario.size() <= 2000
+        && request.resource.data.post_id is string
+        && request.resource.data.autor_nome is string;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
